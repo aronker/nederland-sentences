@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Holland Sentences TTS</title>
+<style>
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f6f8; color: #333; }
+h2 { margin-bottom: 15px; font-weight: 600; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+button, input, select { padding: 8px 14px; font-size: 16px; border-radius: 6px; border: 1px solid #ccc; cursor: pointer; background: #fff; transition: 0.2s; }
+button:hover, input:hover, select:hover { border-color: #a7cbbc; }
+
+table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.1); border-radius: 6px; overflow: hidden; }
+tbody tr td { padding: 12px 15px; border-bottom: 1px solid #eee; }
+thead th { background-color: #a7cbbc; color: #fff; padding: 12px 15px; text-align: left; position: sticky; top: 0; z-index: 10; }
+.play-icon { margin-right: 5px; cursor: pointer; }
+@media (max-width: 600px){
+    tbody tr { display: block; margin-bottom: 10px; }
+    tbody tr td { display: block; width: 100%; padding: 10px; }
+    thead { display: none; }
+}
+</style>
+</head>
+<body>
+
+<h2>Holland Sentences TTS</h2>
+
+<div class="controls">
+    <label>
+        Laad CSV bestand:
+        <input type="file" id="csvFile">
+    </label>
+    <button id="downloadTemplate">Voorbeeld CSV downloaden</button>
+    <label>
+        Sorteren:
+        <select id="sortSelector">
+            <option value="abc">ABC</option>
+            <option value="random">Willekeurig</option>
+        </select>
+    </label>
+</div>
+
+<table id="sentenceTable">
+    <thead>
+        <tr>
+            <th></th>
+            <th>Holland</th>
+            <th>Translation</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<script>
+// ------------------- TTS Setup -------------------
+let selectedVoice = null;
+const synth = window.speechSynthesis;
+
+function detectDutchVoice() {
+    const voices = synth.getVoices();
+    if (!voices.length) return;
+    let voice = voices.find(v => v.lang === "nl-BE") ||
+                voices.find(v => v.lang === "nl-NL") ||
+                voices.find(v => v.lang.toLowerCase().startsWith("nl"));
+    if (voice) selectedVoice = voice;
+}
+if (speechSynthesis.onvoiceschanged !== undefined) {
+    speechSynthesis.onvoiceschanged = detectDutchVoice;
+}
+detectDutchVoice();
+
+function speak(text, onEnd) {
+    if (!text) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = selectedVoice?.lang || "nl-NL";
+    if (selectedVoice) u.voice = selectedVoice;
+    u.pitch = 1; u.rate = 1;
+    if (onEnd) u.onend = onEnd;
+    synth.speak(u);
+}
+
+function stopSpeaking(){
+    synth.cancel();
+}
+
+// ------------------- CSV & Table -------------------
+let sentenceList = [];
+
+function shuffleArray(arr){
+    for(let i=arr.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [arr[i],arr[j]]=[arr[j],arr[i]];
+    }
+}
+
+function displaySentences(sentences){
+    const tbody = document.querySelector("#sentenceTable tbody");
+    tbody.innerHTML="";
+    sentenceList = sentences;
+
+    sentences.forEach(s=>{
+        const tr = document.createElement("tr");
+
+        // Play icon
+        const tdPlay = document.createElement("td");
+        const playBtn = document.createElement("span");
+        playBtn.textContent = "▶️";
+        playBtn.className = "play-icon";
+        let playing = false;
+        playBtn.addEventListener("click", e=>{
+            e.stopPropagation();
+            if(playing){
+                stopSpeaking();
+                playBtn.textContent = "▶️";
+                playing = false;
+            } else {
+                playBtn.textContent = "⏹";
+                playing = true;
+                speak(s.dutch, ()=>{
+                    playBtn.textContent = "▶️";
+                    playing=false;
+                });
+            }
+        });
+        tdPlay.appendChild(playBtn);
+        tr.appendChild(tdPlay);
+
+        // Dutch
+        const tdDutch = document.createElement("td");
+        tdDutch.textContent = s.dutch;
+        tdDutch.addEventListener("click", e=>speak(s.dutch));
+        tr.appendChild(tdDutch);
+
+        // Translation
+        const tdTrans = document.createElement("td");
+        tdTrans.textContent = s.translation;
+        tr.appendChild(tdTrans);
+
+        tbody.appendChild(tr);
+    });
+}
+
+// ------------------- CSV Load -------------------
+function handleFileInput(file){
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev){
+        let lines = ev.target.result.split(/\r?\n/).map(l=>l.trim()).filter(l=>l);
+        lines = lines.slice(1); // skip header
+        const sentences = lines.map(line=>{
+            let parts = line.includes('\t') ? line.split('\t') : line.split(';');
+            parts = parts.map(p=>p.trim());
+            return { dutch: parts[0] || '', translation: parts[1] || '' };
+        });
+
+        const sortMode = document.getElementById("sortSelector").value;
+        if(sortMode==="abc") sentences.sort((a,b)=>a.dutch.localeCompare(b.dutch,'nl'));
+        else if(sortMode==="random") shuffleArray(sentences);
+
+        displaySentences(sentences);
+    };
+    reader.readAsText(file);
+}
+
+// File input
+document.getElementById("csvFile").addEventListener("change", e=>handleFileInput(e.target.files[0]));
+
+// ------------------- Download voorbeeld CSV -------------------
+document.getElementById("downloadTemplate").addEventListener("click", function() {
+    const link = document.createElement("a");
+    link.href = "zinnen.csv";
+    link.download = "zinnen.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+});
+
+// ------------------- Sort selector -------------------
+document.getElementById("sortSelector").addEventListener("change", ()=>{
+    if(!sentenceList.length) return;
+    let sorted = [...sentenceList];
+    const sortMode = document.getElementById("sortSelector").value;
+    if(sortMode==="abc") sorted.sort((a,b)=>a.dutch.localeCompare(b.dutch,'nl'));
+    else if(sortMode==="random") shuffleArray(sorted);
+    displaySentences(sorted);
+});
+
+// ------------------- Autoload zinnen.csv -------------------
+fetch('zinnen.csv')
+.then(resp=>resp.text())
+.then(text=>{
+    const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l).slice(1);
+    const sentences = lines.map(line=>{
+        let parts = line.includes('\t') ? line.split('\t') : line.split(';');
+        parts = parts.map(p=>p.trim());
+        return { dutch: parts[0] || '', translation: parts[1] || '' };
+    });
+    displaySentences(sentences);
+})
+.catch(err=>console.warn("zinnen.csv betöltése nem sikerült:", err));
+</script>
+
+</body>
+</html>
