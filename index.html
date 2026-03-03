@@ -75,7 +75,7 @@ function speak(text, onEnd) {
     const u = new SpeechSynthesisUtterance(text);
     u.lang = selectedVoice?.lang || "nl-NL";
     if (selectedVoice) u.voice = selectedVoice;
-    u.pitch = 1; u.rate = 1;
+    u.pitch = 1; u.rate = 0.8;
     if (onEnd) u.onend = onEnd;
     synth.speak(u);
 }
