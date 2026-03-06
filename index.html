@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Zinnen - Moderne XLSX + LocalStorage</title>
+<title>Zinnen</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
@@ -307,17 +307,6 @@ saveAndDisplay();
 };
 reader.readAsArrayBuffer(file);
 });
-
-// AUTOLOAD zinnen.csv
-fetch('zinnen.csv').then(resp=>resp.text()).then(text=>{
-const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l).slice(1);
-lines.forEach(line=>{
-let parts=line.includes('\t')?line.split('\t'):line.split(';');
-parts=parts.map(p=>p.trim());
-sentenceList.push({translation:parts[0]||'',dutch:parts[1]||''});
-});
-saveAndDisplay();
-}).catch(err=>console.warn("zinnen.csv betöltése nem sikerült:", err));
 
 // INIT
 saveAndDisplay();
